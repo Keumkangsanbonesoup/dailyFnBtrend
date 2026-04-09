@@ -36,7 +36,7 @@ if __name__ == "__main__":
         if not GEMINI_API_KEY:
             raise ValueError("깃허브 Settings -> Secrets에 GEMINI_API_KEY 등록이 누락되었습니다!")
 
-        recent_videos = get_latest_youtube_trends("편의점 신상 OR 핫플 디저트 OR 디저트 먹방")
+        recent_videos = get_latest_youtube_trends("편의점 신상 OR 핫플 디저트 OR 디저트 먹방 OR 오픈런 OR 막차 탑승")
         ai_json_result = summarize_with_ai(recent_videos)
         
         with open("data.js", "w", encoding="utf-8") as f:
