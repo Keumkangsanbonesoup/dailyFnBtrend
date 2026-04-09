@@ -70,7 +70,7 @@ header {
 h1.main-title {
     font-family: 'Galmuri9', sans-serif;
     font-size: 4.5rem;
-    font-weight: 800;
+    font-weight: 400;
     color: var(--text-main);
     margin-bottom: 1rem;
     text-shadow: 4px 4px 0px #FFF, 6px 6px 0px var(--border-dark);
