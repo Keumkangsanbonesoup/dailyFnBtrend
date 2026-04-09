@@ -45,7 +45,7 @@ header {
 
 .pixel-food-img {
     width: 100%;
-    max-width: 860px;
+    max-width: 460px;
     height: auto;
     image-rendering: pixelated;
     image-rendering: crisp-edges;
