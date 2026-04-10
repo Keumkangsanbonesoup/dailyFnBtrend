@@ -39,7 +39,7 @@ def get_latest_youtube_trends(keywords, max_results=5):
     return videos
 
 
-def get_naver_blog_trends(keyword, max_results=5):
+def get_naver_blog_trends(keyword, max_results=7):
     if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
         return []
     encText = urllib.parse.quote(keyword)
@@ -61,7 +61,7 @@ def get_naver_blog_trends(keyword, max_results=5):
         return []
 
 
-def get_community_trends(query, max_results=5):
+def get_community_trends(query, max_results=7):
     if not GOOGLE_API_KEY or not GOOGLE_CX:
         return []
     try:
@@ -225,17 +225,17 @@ if __name__ == "__main__":
 
         print("1. 유튜브 최신 트렌드 수집 중...")
         recent_videos = get_latest_youtube_trends(
-            "편의점 신상 OR 핫플 디저트 OR 먹방 신메뉴 OR 카페 신메뉴 OR 마라탕 OR 탕후루 OR 떡볶이 신메뉴",
-            max_results=5
+            "편의점 신상 OR 핫플 디저트 편의점 신상 OR 유행 솔직후기 OR 디저트 내돈내산 OR 유행 막차 OR 신상 디저트",
+            max_results=7
         )
         print(f"   → 영상 {len(recent_videos)}개 수집 완료.")
 
         print("2. 네이버 블로그 수집 중...")
-        recent_blogs = get_naver_blog_trends("편의점 신상 솔직후기 OR 디저트 내돈내산", max_results=5)
+        recent_blogs = get_naver_blog_trends("편의점 신상 OR 유행 솔직후기 OR 디저트 내돈내산 OR 유행 막차 OR 신상 디저트", max_results=7)
 
         print("3. 커뮤니티 수집 중...")
-        community_query = "(site:twitter.com OR site:x.com OR site:instiz.net OR site:theqoo.net) (편의점 존맛 OR 요즘 유행 디저트 OR 품절)"
-        recent_community = get_community_trends(community_query, max_results=5)
+        community_query = "(site:twitter.com OR site:x.com OR site:instiz.net OR site:theqoo.net) (편의점 신상 OR 요즘 유행 디저트 OR 품절 OR 유행이야 )"
+        recent_community = get_community_trends(community_query, max_results=7)
         print(f"   → 블로그 {len(recent_blogs)}개, 커뮤니티 {len(recent_community)}개 수집 완료.")
 
         print("4. Gemini AI 트렌드 분석 중...")
