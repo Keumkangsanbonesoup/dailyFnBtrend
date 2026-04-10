@@ -24,18 +24,47 @@ one_month_ago_str = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
 
 def get_latest_youtube_trends(keywords, max_results=5):
     youtube = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY)
+    
+    # 1단계: 일단 넉넉하게 15개를 가져옵니다. (조회수 순으로 가져와도 최근 3일이라 허수가 많을 수 있음)
     request = youtube.search().list(
-        part="snippet", q=keywords, type="video",
-        order="viewCount", publishedAfter=three_days_ago, maxResults=max_results
+        part="id", q=keywords, type="video",
+        order="viewCount", publishedAfter=three_days_ago, maxResults=15
     )
-    response = request.execute()
+    search_response = request.execute()
+    
+    video_ids = [item['id']['videoId'] for item in search_response.get("items", [])]
+    
+    if not video_ids:
+        return []
+
+    # 2단계: 추출한 Video ID 묶음으로 '통계(statistics)' 정보를 한 번에 요청합니다.
+    stats_request = youtube.videos().list(
+        part="snippet,statistics",
+        id=",".join(video_ids)
+    )
+    stats_response = stats_request.execute()
+
     videos = []
-    for item in response.get("items", []):
-        videos.append({
-            "title": item["snippet"]["title"],
-            "description": item["snippet"]["description"][:100],
-            "url": f"https://youtube.com/watch?v={item['id']['videoId']}"
-        })
+    for item in stats_response.get("items", []):
+        stats = item.get("statistics", {})
+        view_count = int(stats.get("viewCount", 0))
+        like_count = int(stats.get("likeCount", 0))
+        
+        # 💡 핵심 검증 장치: 최소 반응도 필터링
+        # 예: 조회수 1,000회 이상 OR 좋아요 50개 이상인 영상만 '진짜 화제'로 취급
+        if view_count >= 1000 or like_count >= 50:
+            videos.append({
+                "title": item["snippet"]["title"],
+                "description": item["snippet"]["description"][:100],
+                "url": f"https://youtube.com/watch?v={item['id']}"
+            })
+            
+            print(f"   🔥 [검증 통과] 조회수: {view_count} / 좋아요: {like_count} - {item['snippet']['title'][:20]}...")
+            
+        # 목표한 개수(max_results)를 채우면 즉시 중단
+        if len(videos) >= max_results:
+            break
+            
     return videos
 
 
