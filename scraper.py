@@ -42,20 +42,38 @@ def get_latest_youtube_trends(keywords, max_results=5):
 def get_naver_blog_trends(keyword, max_results=7):
     if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
         return []
+    
     encText = urllib.parse.quote(keyword)
-    url = f"https://openapi.naver.com/v1/search/blog?query={encText}&display={max_results}&sort=sim"
+    # 💡 수정 1: sort=date(최신순)로 변경하고, 필터링을 위해 display=30으로 넉넉히 가져옵니다.
+    url = f"https://openapi.naver.com/v1/search/blog?query={encText}&display=30&sort=date"
     req = urllib.request.Request(url, headers={
         'X-Naver-Client-Id': NAVER_CLIENT_ID,
         'X-Naver-Client-Secret': NAVER_CLIENT_SECRET
     })
+    
     try:
         with urllib.request.urlopen(req) as response:
             result = json.loads(response.read().decode('utf-8'))
-            return [{
-                "title": item['title'].replace("<b>", "").replace("</b>", ""),
-                "description": item['description'].replace("<b>", "").replace("</b>", "")[:100],
-                "link": item['link']
-            } for item in result.get('items', [])]
+            
+            # 💡 수정 2: 3일 전 날짜를 YYYYMMDD 형식의 문자열로 생성
+            three_days_ago_date = (datetime.now() - timedelta(days=3)).strftime('%Y%m%d')
+            
+            filtered_blogs = []
+            for item in result.get('items', []):
+                # 💡 수정 3: postdate가 3일 전 날짜보다 크거나 같은(최신인) 글만 수집
+                if item.get('postdate', '') >= three_days_ago_date:
+                    filtered_blogs.append({
+                        "title": item['title'].replace("<b>", "").replace("</b>", ""),
+                        "description": item['description'].replace("<b>", "").replace("</b>", "")[:100],
+                        "link": item['link']
+                    })
+                
+                # 원하는 개수(max_results)를 채우면 루프 종료
+                if len(filtered_blogs) >= max_results:
+                    break
+                    
+            return filtered_blogs
+            
     except Exception as e:
         print(f"  ⚠️ 네이버 블로그 검색 오류: {e}")
         return []
@@ -67,7 +85,10 @@ def get_community_trends(query, max_results=7):
     try:
         service = build("customsearch", "v1", developerKey=GOOGLE_API_KEY)
         res = service.cse().list(
-            q=query, cx=GOOGLE_CX, dateRestrict="w1", num=max_results
+            q=query, 
+            cx=GOOGLE_CX, 
+            dateRestrict="d3", # 💡 수정: "w1" (1주일) -> "d3" (3일)로 변경
+            num=max_results
         ).execute()
         return [{
             "title": item.get('title', ''),
@@ -77,7 +98,6 @@ def get_community_trends(query, max_results=7):
     except Exception as e:
         print(f"  ⚠️ 구글 커스텀 검색 오류: {e}")
         return []
-
 
 def get_naver_trend(keyword):
     if not NAVER_CLIENT_ID or not NAVER_CLIENT_SECRET:
