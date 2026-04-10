@@ -114,10 +114,17 @@ def get_naver_trend(keyword):
 
 
 def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=5):
-    """Gemini 2.5 Flash로 다각적 데이터를 분석하고 출처 간 교차 검증을 수행합니다."""
+    """Gemini AI로 데이터를 분석합니다. 2.5-flash 모델 실패 시 1.5-flash로 자동 폴백(Fallback)합니다."""
     import time
-    # 요약 품질을 위해 똑똑한 gemini-2.5-flash 모델 유지
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+    
+    # 모델 전환을 위한 배열 (처음 3번은 2.5-flash 시도, 실패하면 1.5-flash로 우회)
+    models_to_try = [
+        "gemini-2.5-flash",
+        "gemini-2.5-flash", 
+        "gemini-2.5-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash"
+    ]
 
     prompt = f"""
 당신은 대한민국 F&B(식음료) 트렌드 전문 분석가입니다.
@@ -133,7 +140,7 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=5):
 {json.dumps(community_data, ensure_ascii=False)}
 
 [분석 지시]
-위 세 가지 데이터를 분석하여, 현재 한국에서 실제로 유행하거나 화제가 되고 있는 구체적인 F&B 아이템 6개를 추출하세요.
+위 세 가지 데이터를 분석하여, 현재 한국에서 실제로 유행하거나 화제가 되고 있는 구체적인 F&B 아이템 5개를 추출하세요.
 단일 출처가 아닌, **여러 출처에서 공통으로 언급되는 유행 아이템**을 최우선으로 선정하세요.
 
 중요:
@@ -151,6 +158,9 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=5):
     data = {"contents": [{"parts": [{"text": prompt}]}]}
 
     for attempt in range(max_retries):
+        current_model = models_to_try[attempt]
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={GEMINI_API_KEY}"
+        
         try:
             req = urllib.request.Request(
                 url,
@@ -161,15 +171,14 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=5):
                 result = json.loads(response.read().decode('utf-8'))
                 text = result['candidates'][0]['content']['parts'][0]['text'].strip()
                 
-                # 에러(SyntaxError)를 유발했던 텍스트 파싱 부분을 안전하게 교체
+                # 마크다운 포맷 파싱 안전장치
                 text = text.replace("```json", "").replace("```", "").strip()
                 return text
                 
         except Exception as e:
             if attempt < max_retries - 1:
-                # 대기 시간을 15초, 30초, 45초, 60초로 넉넉하게 늘려 서버 과부하를 피합니다.
-                wait = (attempt + 1) * 15
-                print(f"   ⚠️ Gemini API 서버 지연 ({e}). {wait}초 후 재시도... ({attempt+1}/{max_retries})")
+                wait = (attempt + 1) * 10
+                print(f"   ⚠️ Gemini API 서버 지연 ({e}). [{current_model}] 시도 실패. {wait}초 후 재시도... ({attempt+1}/{max_retries})")
                 time.sleep(wait)
             else:
                 raise
