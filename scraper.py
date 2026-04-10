@@ -105,20 +105,47 @@ def get_naver_trend(keyword):
 
 
 def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=2):
+    """프롬프트는 단순 추출만. 교차검증은 Python에서 별도 처리."""
     import time
 
-    # ✅ RPD 여유 순으로 정렬: Flash(250) → Flash-Lite(1000) → 1.5-flash(구형이지만 안정)
     MODEL_FALLBACKS = [
-        "gemini-2.0-flash",           # 기본: 안정적
-        "gemini-2.5-flash-lite",      # 1차 폴백: RPD 1,000으로 가장 넉넉
-        "gemini-1.5-flash",           # 최후 보루: 구형이지만 거의 막히지 않음
+        "gemini-2.0-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-1.5-flash",
     ]
 
-    prompt = f"""... (기존 프롬프트 그대로) ..."""
+    # ✅ 프롬프트에서 교차검증 지시 제거 → 가볍게 유지
+    # mentioned_in만 AI가 판단하도록 추가 (교차검증 로직은 Python에서)
+    prompt = f"""
+당신은 대한민국 F&B(식음료) 트렌드 전문 분석가입니다.
+아래는 최근 수집된 유튜브, 네이버 블로그, 커뮤니티 데이터입니다.
+
+[유튜브]
+{json.dumps(videos_data, ensure_ascii=False)}
+
+[네이버 블로그]
+{json.dumps(blogs_data, ensure_ascii=False)}
+
+[커뮤니티/SNS]
+{json.dumps(community_data, ensure_ascii=False)}
+
+위 데이터를 바탕으로 현재 한국에서 화제인 F&B 아이템 5개를 추출하세요.
+
+규칙:
+- 반드시 실제 상품명, 메뉴명, 브랜드명으로 작성
+- "디저트 유행" 같은 모호한 표현 금지
+- sentiment는 "hot" / "growing" / "new" 중 하나
+- keywords는 실제 검색어 3~5개
+- mentioned_in은 아이템이 언급된 출처를 "youtube", "naver_blog", "community" 중에서 모두 표기
+- source_video는 참고한 URL 중 하나
+
+아래 JSON만 출력:
+{{"updated_at": "{today_str}", "summary": "한 문장 핵심 요약", "trends": [{{"id": 1, "title": "상품명", "description": "화제 이유 2~3문장", "sentiment": "hot", "keywords": ["키워드1", "키워드2"], "mentioned_in": ["youtube", "naver_blog"], "source_video": "URL"}}]}}
+"""
 
     data = {"contents": [{"parts": [{"text": prompt}]}]}
-
     last_error = None
+
     for model in MODEL_FALLBACKS:
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={GEMINI_API_KEY}"
         print(f"   🤖 모델 시도: {model}")
@@ -141,17 +168,11 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=2):
                 error_body = e.read().decode('utf-8') if e.fp else ""
                 last_error = f"HTTP {e.code}: {error_body[:200]}"
                 print(f"   ⚠️ {last_error}")
-
-                if e.code == 429:
-                    # RPD 소진 → 재시도해도 의미 없으니 즉시 다음 모델로
-                    print(f"   ❌ RPD 소진. 다음 모델로 전환.")
-                    break
-                elif e.code in (404, 400):
-                    # 모델 없음 → 즉시 다음 모델로
-                    print(f"   ❌ 모델 '{model}' 사용 불가. 다음 모델로 전환.")
+                if e.code in (429, 404, 400):
+                    print(f"   ❌ 다음 모델로 전환.")
                     break
                 elif e.code in (500, 503):
-                    time.sleep(10)  # 서버 과부하는 잠깐 기다렸다 재시도
+                    time.sleep(10)
 
             except Exception as e:
                 last_error = str(e)
@@ -159,3 +180,85 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=2):
                 time.sleep(5)
 
     raise RuntimeError(f"모든 모델 시도 실패. 마지막 에러: {last_error}")
+
+
+def enrich_with_naver_trends(trend_data):
+    """
+    ✅ 교차검증 + 네이버 트렌드 보강을 Python에서 처리.
+    AI 프롬프트가 아닌 코드 레벨에서 수행하므로 속도에 영향 없음.
+    """
+    if not NAVER_CLIENT_ID:
+        print("네이버 API 키 없음. 건너뜁니다.")
+        return trend_data
+
+    for trend in trend_data.get("trends", []):
+        main_keyword = trend.get("keywords", [trend.get("title", "")])[0]
+        sources = trend.get("mentioned_in", [])
+
+        # ✅ 교차검증: 2개 이상 출처에서 언급됐는지 Python에서 판단
+        if len(sources) >= 2:
+            print(f"   🔥 [교차검증 성공] '{trend['title']}' - {', '.join(sources)}")
+            trend["cross_verified"] = True
+        else:
+            print(f"   ⚠️ [단일 출처] '{trend['title']}' - {', '.join(sources)}")
+            trend["cross_verified"] = False
+
+        # ✅ 네이버 데이터랩으로 검색량 보강
+        naver_result = get_naver_trend(main_keyword)
+        if naver_result:
+            trend["naver_trend"] = naver_result
+            # ✅ 교차검증 성공 + 상승세면 sentiment 자동 승격
+            if naver_result["is_rising"] and trend.get("sentiment") == "growing" and trend["cross_verified"]:
+                trend["sentiment"] = "hot"
+                print(f"      ↳ sentiment 승격: growing → hot")
+        print(f"      ↳ 네이버 트렌드 조회: {main_keyword}")
+
+    return trend_data
+
+
+if __name__ == "__main__":
+    try:
+        if not YOUTUBE_API_KEY:
+            raise ValueError("YOUTUBE_API_KEY 시크릿이 설정되지 않았습니다!")
+        if not GEMINI_API_KEY:
+            raise ValueError("GEMINI_API_KEY 시크릿이 설정되지 않았습니다!")
+
+        print("1. 유튜브 최신 트렌드 수집 중...")
+        recent_videos = get_latest_youtube_trends(
+            "편의점 신상 OR 핫플 디저트 OR 먹방 신메뉴 OR 카페 신메뉴 OR 마라탕 OR 탕후루 OR 떡볶이 신메뉴",
+            max_results=5
+        )
+        print(f"   → 영상 {len(recent_videos)}개 수집 완료.")
+
+        print("2. 네이버 블로그 수집 중...")
+        recent_blogs = get_naver_blog_trends("편의점 신상 솔직후기 OR 디저트 내돈내산", max_results=5)
+
+        print("3. 커뮤니티 수집 중...")
+        community_query = "(site:twitter.com OR site:x.com OR site:instiz.net OR site:theqoo.net) (편의점 존맛 OR 요즘 유행 디저트 OR 품절)"
+        recent_community = get_community_trends(community_query, max_results=5)
+        print(f"   → 블로그 {len(recent_blogs)}개, 커뮤니티 {len(recent_community)}개 수집 완료.")
+
+        print("4. Gemini AI 트렌드 분석 중...")
+        ai_json_str = summarize_with_ai(recent_videos, recent_blogs, recent_community)
+        trend_data = json.loads(ai_json_str)
+        print(f"   → 트렌드 {len(trend_data.get('trends', []))}개 추출 완료.")
+
+        print("5. 교차검증 + 네이버 데이터랩 보강 중...")
+        trend_data = enrich_with_naver_trends(trend_data)
+
+        with open("data.js", "w", encoding="utf-8") as f:
+            f.write(f"const trendData = {json.dumps(trend_data, ensure_ascii=False)};\n")
+
+        print("✅ 완료! data.js 업데이트 성공.")
+
+    except Exception as e:
+        error_msg = traceback.format_exc()
+        error_data = {
+            "error": str(e),
+            "traceback": error_msg[-600:],
+            "key_check": "OK" if GEMINI_API_KEY else "FAIL"
+        }
+        with open("data.js", "w", encoding="utf-8") as f:
+            f.write(f"const trendData = {json.dumps(error_data, ensure_ascii=False)};\n")
+        print(f"❌ 에러 발생: {e}")
+        raise
