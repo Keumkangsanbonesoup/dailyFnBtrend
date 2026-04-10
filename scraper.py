@@ -115,15 +115,16 @@ def get_naver_trend(keyword):
 
 
 def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=5):
-    """현재 서비스 중인 최신 Gemini AI 모델들로 데이터를 분석합니다."""
+    """회원님이 처음 성공하셨던 gemini-2.5-flash 모델을 기본으로 사용합니다."""
     import time
     
-    # 404 에러의 주범인 구형(1.5, 1.0) 모델들을 삭제하고, 현재 구글이 서비스 중인 최신 모델들로만 리스트업!
+    # 2.5-flash를 3번 시도하고, 만약의 사태를 위해 1.5-flash를 후순위로만 둡니다.
     models_to_try = [
         "gemini-2.5-flash",
-        "gemini-2.0-flash",
-        "gemini-2.5-pro",
-        "gemini-2.0-pro-exp"
+        "gemini-2.5-flash",
+        "gemini-2.5-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash"
     ]
 
     prompt = f"""
@@ -158,10 +159,7 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=5):
     data = {"contents": [{"parts": [{"text": prompt}]}]}
 
     for attempt in range(max_retries):
-        # 만약 시도 횟수가 모델 개수보다 많아지면, 마지막 모델을 계속 재시도
-        model_index = attempt if attempt < len(models_to_try) else -1
-        current_model = models_to_try[model_index]
-        
+        current_model = models_to_try[attempt]
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{current_model}:generateContent?key={GEMINI_API_KEY}"
         
         try:
@@ -178,21 +176,29 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=5):
                 return text
                 
         except urllib.error.HTTPError as e:
-            error_body = e.read().decode('utf-8') if e.fp else "No error body"
             if attempt < max_retries - 1:
-                # 503 에러 대응을 위해 대기 시간을 넉넉하게 설정
-                wait = (attempt + 1) * 10
-                print(f"   ⚠️ API 응답 지연/오류 ({e.code}). [{current_model}] 실패.")
-                print(f"      사유: {error_body.strip()}")
-                print(f"      → {wait}초 후 다음 최신 모델로 우회 시도... ({attempt+1}/{max_retries})")
+                # 에러 코드에 맞춘 스마트 쿨타임 대기
+                if e.code == 429:
+                    wait = 65
+                    print(f"   ⚠️ 무료 할당량(RPM) 일시 초과. 쿨타임 리셋을 위해 {wait}초 휴식합니다... ({attempt+1}/{max_retries})")
+                elif e.code == 503:
+                    wait = 15
+                    print(f"   ⚠️ 서버 일시 과부하. {wait}초 후 재시도... ({attempt+1}/{max_retries})")
+                elif e.code == 404:
+                    wait = 5
+                    print(f"   ⚠️ [{current_model}] 접근 불가. 다음 모델로 우회... ({attempt+1}/{max_retries})")
+                else:
+                    wait = 10
+                    print(f"   ⚠️ API 오류 ({e.code}). {wait}초 후 재시도... ({attempt+1}/{max_retries})")
                 time.sleep(wait)
             else:
+                error_body = e.read().decode('utf-8') if e.fp else "알 수 없는 에러"
                 print(f"❌ 최종 에러 사유: {error_body}")
                 raise
         except Exception as e:
             if attempt < max_retries - 1:
-                wait = (attempt + 1) * 10
-                print(f"   ⚠️ 네트워크 통신 지연 ({e}). [{current_model}] 시도 실패. {wait}초 후 재시도... ({attempt+1}/{max_retries})")
+                wait = 10
+                print(f"   ⚠️ 네트워크 통신 지연 ({e}). {wait}초 후 재시도... ({attempt+1}/{max_retries})")
                 time.sleep(wait)
             else:
                 raise
