@@ -77,33 +77,37 @@ document.addEventListener('DOMContentLoaded', async () => {
     const triggerParticle = (button) => {
         const container = button.parentElement;
         
-        // 한 번 클릭할 때마다 6~10개의 파티클이 터집니다
-        const particleCount = Math.floor(Math.random() * 5) + 6;
-        const emojis = ['🔥', '🔥', '🔥', '✨', '💥']; // 불꽃 위주에 반짝임과 스파크 추가
+        // 한 번 클릭할 때마다 8~12개의 파티클이 터지도록 개수 증가
+        const particleCount = Math.floor(Math.random() * 5) + 8;
+        const emojis = ['🔥', '🔥', '🔥', '✨', '💥', '🧡']; // 🧡 이모지도 슬쩍 추가
 
         for (let i = 0; i < particleCount; i++) {
             const particle = document.createElement('div');
             
             particle.textContent = emojis[Math.floor(Math.random() * emojis.length)];
             
-            // JS 애니메이션 전용 스타일 세팅 (CSS 충돌 방지)
+            // 💡 문제 해결 핵심: 기존 CSS 파일에 남아있는 소심한 애니메이션 강제 무력화
+            particle.style.animation = 'none';
+            
+            // JS 애니메이션 전용 스타일 세팅
             particle.style.position = 'absolute';
             particle.style.left = `calc(50% - 15px)`;
             particle.style.top = `10px`;
             particle.style.pointerEvents = 'none';
             particle.style.zIndex = '5';
             particle.style.userSelect = 'none';
+            particle.style.fontSize = '1.8rem'; // 파티클 크기 확대
             
             container.appendChild(particle);
 
-            // X축: 좌우로 넓게 퍼짐 (-120px ~ +120px)
-            const tx = (Math.random() - 0.5) * 240;
-            // Y축: 위로 높게 솟구침 (-80px ~ -200px)
-            const ty = (Math.random() * -120) - 80;
+            // X축: 좌우로 더 넓게 퍼짐 (-150px ~ +150px)
+            const tx = (Math.random() - 0.5) * 300;
+            // Y축: 위로 더 높게 솟구침 (-80px ~ -220px)
+            const ty = (Math.random() * -140) - 80;
             // 랜덤 회전각 (-90도 ~ +90도)
             const rot = (Math.random() - 0.5) * 180;
-            // 랜덤 최종 크기 (0.8배 ~ 2.0배)
-            const endScale = Math.random() * 1.2 + 0.8;
+            // 랜덤 최종 크기 (0.8배 ~ 2.2배)
+            const endScale = Math.random() * 1.4 + 0.8;
             
             const duration = Math.random() * 600 + 600; // 0.6초 ~ 1.2초의 랜덤 지속시간
 
