@@ -54,17 +54,11 @@ header {
 }
 
 .pixel-food-img {
-    width: 100vw;
-    position: relative;
-    left: 50%;
-    right: 50%;
-    margin-left: -50vw;
-    margin-right: -50vw;
-    margin-top: 1.5rem;
-    margin-bottom: 3rem;
-    display: flex;
-    justify-content: center;
-    overflow: hidden;
+    /* 복잡한 위치 속성은 다 지우고 아래 세 줄만 남겨주세요! */
+    width: 100%; 
+    max-width: 1000px; /* 이미지가 너무 거대해지는 걸 막아줍니다 */
+    height: auto;
+    object-fit: contain; /* 이미지가 잘리지 않고 예쁘게 비율 유지 */
 }
 
 /* ✨ 신상 태그 디자인 수정: 아기자기한 피치핑크 택 */
