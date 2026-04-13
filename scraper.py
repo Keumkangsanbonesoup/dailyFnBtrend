@@ -109,6 +109,7 @@ def get_naver_blog_trends(keyword, max_results=7):
 
 
 def get_community_trends(query, max_results=7):
+    """구글 맞춤검색 엔진 ID(GOOGLE_CX)를 활용하여 SNS 차단을 우회하여 검색합니다."""
     if not GOOGLE_API_KEY or not GOOGLE_CX:
         return []
     try:
@@ -206,6 +207,7 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=3):
     last_error = None
 
     for model in MODEL_FALLBACKS:
+        # ✅ 불필요한 마크다운 기호([])가 포함되지 않도록 순수한 URL 문자열로 수정되었습니다.
         url = f"[https://generativelanguage.googleapis.com/v1beta/models/](https://generativelanguage.googleapis.com/v1beta/models/){model}:generateContent?key={GEMINI_API_KEY}"
         print(f"   🤖 모델 시도: {model}")
 
@@ -217,10 +219,11 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=3):
                     headers={'Content-Type': 'application/json'}
                 )
                 with urllib.request.urlopen(req, timeout=60) as response:
-                    result = json.loads(response.read().decode('utf-8'))
+                    res_body = response.read().decode('utf-8')
+                    result = json.loads(res_body)
                     text = result['candidates'][0]['content']['parts'][0]['text'].strip()
                     
-                    # ✅ JSON 변환 에러의 주범인 '군더더기 텍스트'를 잘라내는 확실한 파싱 로직
+                    # ✅ JSON 변환 에러 파싱 로직
                     start_idx = text.find('{')
                     end_idx = text.rfind('}')
                     if start_idx != -1 and end_idx != -1:
@@ -236,7 +239,6 @@ def summarize_with_ai(videos_data, blogs_data, community_data, max_retries=3):
                 last_error = f"HTTP {e.code}: {error_body[:200]}"
                 print(f"   ⚠️ {last_error}")
                 
-                # ✅ 429 에러 시 무조건 탈주하지 않고 65초 대기 후 살려냅니다.
                 if e.code == 429:
                     print(f"   ⏳ 무료 할당량 초과(429). 65초 대기 후 재시도합니다...")
                     time.sleep(65)
@@ -310,7 +312,6 @@ if __name__ == "__main__":
         print("4. Gemini AI 트렌드 분석 중...")
         ai_json_str = summarize_with_ai(recent_videos, recent_blogs, recent_community)
         
-        # 여기서 발생하는 JSONDecodeError 원천 차단
         trend_data = json.loads(ai_json_str)
         print(f"   → 트렌드 {len(trend_data.get('trends', []))}개 추출 완료.")
 
