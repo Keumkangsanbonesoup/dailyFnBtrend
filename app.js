@@ -37,6 +37,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 const color = trend.naver_trend.is_rising ? '#B3E2A7' : '#FFD6D6';
                 naverBadge = `<span class="sentiment" style="background:${color}; margin-left:8px;">${arrow}</span>`;
             }
+            let verifiedBadge = '';
+            if (trend.cross_verified) {
+                verifiedBadge = `<span class="sentiment" style="background:#D4EDFF; margin-left:8px;">✅ 교차검증 완료</span>`;
+            }
 
             const card = document.createElement('div');
             card.className = `trend-card card-${index + 1}`;
