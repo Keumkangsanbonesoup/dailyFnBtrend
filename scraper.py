@@ -16,7 +16,7 @@ GOOGLE_CX = os.environ.get("GOOGLE_CX", "").strip()
 GOOGLE_API_KEY = os.environ.get("GOOGLE_API_KEY", "").strip()
 
 # 시간 설정
-time_limit = datetime.now(timezone.utc) - timedelta(days=3)
+time_limit = datetime.now(timezone.utc) - timedelta(days=5)
 three_days_ago = time_limit.strftime('%Y-%m-%dT%H:%M:%SZ')
 today_str = datetime.now().strftime('%Y-%m-%d')
 one_month_ago_str = (datetime.now() - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -28,7 +28,7 @@ def get_latest_youtube_trends(keywords, max_results=5):
     # 1단계: 일단 넉넉하게 15개를 가져옵니다.
     request = youtube.search().list(
         part="id", q=keywords, type="video",
-        order="viewCount", publishedAfter=three_days_ago, maxResults=15
+        order="viewCount", publishedAfter=fifth_days_ago, maxResults=20
     )
     search_response = request.execute()
     
