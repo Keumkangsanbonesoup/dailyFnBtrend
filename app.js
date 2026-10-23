@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         if (summaryEl) summaryEl.textContent = '트렌드 데이터를 불러오는 데 실패했습니다.';
     }
 
-    // 🔥 여기서부터 불꽃 파티클 버튼 애니메이션 및 영구 카운트(Firebase DB) 로직입니다 🔥
+    // 🔥 불꽃 파티클 버튼 애니메이션 및 브라우저 내 임시 카운트 🔥
     const fireBtn = document.getElementById('fire-btn');
     if (!fireBtn) return;
 
@@ -126,56 +126,6 @@ document.addEventListener('DOMContentLoaded', async () => {
         }
     };
 
-    // 2. 회원님의 실제 Firebase 데이터베이스 연동 (실시간 누적 로직)
-    let updateDbCount = null;
-
-    try {
-        // 공식 DB 모듈 로드
-        const { initializeApp } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js");
-        const { getFirestore, doc, onSnapshot, setDoc, updateDoc, increment, getDoc } = await import("https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js");
-
-        // 🔥 전달해주신 회원님만의 설정값 적용 완료! 🔥
-        const firebaseConfig = {
-            apiKey: "AIzaSyBOpIpRMPEj27XieFl2bzzLRtdlPlRLNZU",
-            authDomain: "fnb-trend-db.firebaseapp.com",
-            projectId: "fnb-trend-db",
-            storageBucket: "fnb-trend-db.firebasestorage.app",
-            messagingSenderId: "1092465751942",
-            appId: "1:1092465751942:web:28836a7613f6ffb9a85e07",
-            measurementId: "G-HK9022ZPN8"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-
-        // 데이터베이스 저장 위치 지정 (reactions 폴더 안의 fire 문서)
-        const dbRef = doc(db, 'reactions', 'fire');
-
-        // 처음 눌리는 상태면 숫자 0으로 문서 생성
-        const docSnap = await getDoc(dbRef);
-        if (!docSnap.exists()) {
-            await setDoc(dbRef, { count: 0 });
-        }
-
-        // 모든 방문자의 클릭 수를 실시간 감지하여 화면에 반영
-        onSnapshot(dbRef, (snapshot) => {
-            if (snapshot.exists()) {
-                localCount = snapshot.data().count || 0;
-                fireBtn.textContent = `도움되었다면 🔥를 눌러주세요 (${localCount})`;
-            }
-        }, (error) => {
-            console.error("Firestore 감지 에러:", error);
-        });
-
-        // 카운트 +1 증가 함수 세팅
-        updateDbCount = async () => {
-            await updateDoc(dbRef, { count: increment(1) });
-        };
-    } catch (e) {
-        console.error("데이터베이스 초기화 에러:", e);
-        fireBtn.textContent = `도움되었다면 🔥를 눌러주세요 (0)`;
-    }
-
     // 3. 버튼 클릭 시 동작
     fireBtn.addEventListener('click', function() {
         triggerParticle(this); // 화려해진 파티클 폭발!
@@ -184,9 +134,5 @@ document.addEventListener('DOMContentLoaded', async () => {
         localCount++;
         this.textContent = `도움되었다면 🔥를 눌러주세요 (${localCount})`;
 
-        // 데이터베이스에 숫자 영구 저장 전송
-        if (updateDbCount) {
-            updateDbCount().catch(err => console.error("카운트 업데이트 실패:", err));
-        }
     });
 });
